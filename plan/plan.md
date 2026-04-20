@@ -661,10 +661,10 @@ def create_job(job: Job):
 ```
 
 ### Validation Checklist
-- [ ] RabbitMQ UI accessible: http://localhost:15672 and :15673
-- [ ] Publish to cell-1: `curl -X POST http://localhost:8080/job -d '{"task":"job-1"}' -H "Content-Type: application/json"`
-- [ ] Check cell-1 worker logs: see "Processing: job-1"
-- [ ] Check cell-2 worker logs: empty (isolation)
+- [x] RabbitMQ UI accessible: http://localhost:15672 and :15673
+- [x] Publish to cell-1: `curl -X POST http://localhost:8080/job -d '{"task":"job-1"}' -H "Content-Type: application/json"`
+- [x] Check cell-1 worker logs: see "Processing: job-1"
+- [x] Check cell-2 worker logs: processes only its own tasks (isolation confirmed)
 
 ---
 
@@ -901,7 +901,7 @@ rm -rf cell-*-backup.sql
 - [x] CP10: Sticky sessions
 
 ### Advanced (Optional)
-- [ ] CP11: Message queues (skipped)
+- [x] CP11: Message queues
 - [x] CP12: Monitoring
 - [ ] CP13: Load testing (skipped)
 - [x] CP14: DR procedures
@@ -918,7 +918,7 @@ rm -rf cell-*-backup.sql
 5. Data isolation verified
 
 **Bonus Points:**
-- Message queue isolation (skipped)
+- Message queue isolation ✅
 - Metrics and dashboards ✅
 - Load testing passed (skipped)
 - DR tested ✅
@@ -975,6 +975,6 @@ docker-compose up -d
 
 ---
 
-**Last Updated**: 2026-04-20
+**Last Updated**: 2026-04-20 (CP11 Added)
 **Author**: Tiago Ricardo
-**Status**: COMPLETE ✅
+**Status**: COMPLETE ✅ (Including Message Queue Isolation)

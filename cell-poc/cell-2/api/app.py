@@ -7,6 +7,7 @@ from typing import Optional
 from prometheus_client import Counter, Histogram, generate_latest
 from fastapi.responses import Response
 import time
+import pika
 
 app = FastAPI()
 redis_client = Redis(
@@ -22,6 +23,10 @@ REQUEST_DURATION = Histogram(
 class DataItem(BaseModel):
     key: str
     value: str
+
+
+class Job(BaseModel):
+    task: str
 
 
 def get_db_connection():
@@ -101,3 +106,19 @@ def delete_data(key: str):
     conn.close()
     redis_client.delete(key)
     return {"status": "deleted", "cell": os.getenv("CELL_ID")}
+
+
+@app.post("/job")
+def create_job(job: Job):
+    rabbitmq_host = os.getenv("RABBITMQ_HOST", "cell-1-rabbitmq")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host))
+    channel = connection.channel()
+    channel.queue_declare(queue="tasks", durable=True)
+    channel.basic_publish(
+        exchange="",
+        routing_key="tasks",
+        body=job.task,
+        properties=pika.BasicProperties(delivery_mode=2),
+    )
+    connection.close()
+    return {"status": "queued", "task": job.task, "cell": os.getenv("CELL_ID")}

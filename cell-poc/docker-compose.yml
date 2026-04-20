@@ -26,12 +26,23 @@ services:
       timeout: 3s
       retries: 3
 
+  cell-1-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    networks:
+      - cell-1-net
+    ports:
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
   cell-1-api:
     build: ./cell-1/api
     environment:
       CELL_ID: cell-1
       POSTGRES_HOST: cell-1-postgres
       REDIS_HOST: cell-1-redis
+      RABBITMQ_HOST: cell-1-rabbitmq
       DB_NAME: celldb
       DB_USER: celluser
       DB_PASS: cellpass123
@@ -77,12 +88,23 @@ services:
       timeout: 3s
       retries: 3
 
+  cell-2-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    networks:
+      - cell-2-net
+    ports:
+      - "15673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
   cell-2-api:
     build: ./cell-2/api
     environment:
       CELL_ID: cell-2
       POSTGRES_HOST: cell-2-postgres
       REDIS_HOST: cell-2-redis
+      RABBITMQ_HOST: cell-2-rabbitmq
       DB_NAME: celldb
       DB_USER: celluser
       DB_PASS: cellpass123
@@ -128,6 +150,28 @@ services:
     networks:
       - cell-1-net
       - cell-2-net
+
+  cell-1-worker:
+    build: ./cell-1/worker
+    environment:
+      CELL_ID: cell-1
+      RABBITMQ_HOST: cell-1-rabbitmq
+    networks:
+      - cell-1-net
+    depends_on:
+      cell-1-rabbitmq:
+        condition: service_started
+
+  cell-2-worker:
+    build: ./cell-2/worker
+    environment:
+      CELL_ID: cell-2
+      RABBITMQ_HOST: cell-2-rabbitmq
+    networks:
+      - cell-2-net
+    depends_on:
+      cell-2-rabbitmq:
+        condition: service_started
 
 networks:
   cell-1-net:
