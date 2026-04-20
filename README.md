@@ -14,8 +14,16 @@ Two independent "cells" that run separately but share a common router. Each cell
 
 ```bash
 cd cell-poc
-docker-compose up -d
+make start
 ```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `make start` | Start all services |
+| `make clean` | Stop and remove all containers |
+| `make test` | Test auto-failover (~40s) |
 
 ## Endpoints
 
@@ -33,15 +41,6 @@ docker-compose up -d
 - **Auto-failover** - Router switches to healthy cell
 - **Sticky sessions** - Users stay on same cell
 - **Monitoring** - Prometheus + Grafana included
-
-## Test
-
-```bash
-curl localhost:80/health        # via router
-curl localhost:8080/health      # cell-1 direct
-```
-
-
 
 ## Documentation
 
