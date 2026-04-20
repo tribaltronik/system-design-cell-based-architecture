@@ -976,5 +976,5 @@ docker-compose up -d
 ---
 
 **Last Updated**: 2026-04-20
-**Author**: Cloud Platform Engineer
+**Author**: Tiago Ricardo
 **Status**: COMPLETE ✅
