@@ -171,7 +171,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../code/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     networks:
@@ -185,7 +185,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ../code/monitoring/grafana/provisioning:/etc/grafana/provisioning
     networks:
       - cell-1-net
       - cell-2-net
