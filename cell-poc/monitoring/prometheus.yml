@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'cell-1-api'
+    static_configs:
+      - targets: ['cell-1-api:8000']
+        labels:
+          cell: 'cell-1'
+  
+  - job_name: 'cell-2-api'
+    static_configs:
+      - targets: ['cell-2-api:8000']
+        labels:
+          cell: 'cell-2'

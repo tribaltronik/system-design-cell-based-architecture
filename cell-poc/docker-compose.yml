@@ -1,0 +1,139 @@
+services:
+  cell-1-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: celldb
+      POSTGRES_USER: celluser
+      POSTGRES_PASSWORD: cellpass123
+    volumes:
+      - ./cell-1/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - cell-1-pg-data:/var/lib/postgresql/data
+    networks:
+      - cell-1-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U celluser"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  cell-1-redis:
+    image: redis:7-alpine
+    networks:
+      - cell-1-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  cell-1-api:
+    build: ./cell-1/api
+    environment:
+      CELL_ID: cell-1
+      POSTGRES_HOST: cell-1-postgres
+      REDIS_HOST: cell-1-redis
+      DB_NAME: celldb
+      DB_USER: celluser
+      DB_PASS: cellpass123
+    ports:
+      - "8080:8000"
+    networks:
+      - cell-1-net
+    depends_on:
+      cell-1-postgres:
+        condition: service_healthy
+      cell-1-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  cell-2-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: celldb
+      POSTGRES_USER: celluser
+      POSTGRES_PASSWORD: cellpass123
+    volumes:
+      - ./cell-2/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - cell-2-pg-data:/var/lib/postgresql/data
+    networks:
+      - cell-2-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U celluser"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  cell-2-redis:
+    image: redis:7-alpine
+    networks:
+      - cell-2-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  cell-2-api:
+    build: ./cell-2/api
+    environment:
+      CELL_ID: cell-2
+      POSTGRES_HOST: cell-2-postgres
+      REDIS_HOST: cell-2-redis
+      DB_NAME: celldb
+      DB_USER: celluser
+      DB_PASS: cellpass123
+    ports:
+      - "8081:8000"
+    networks:
+      - cell-2-net
+    depends_on:
+      cell-2-postgres:
+        condition: service_healthy
+      cell-2-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  router:
+    build: ./router
+    ports:
+      - "80:80"
+    networks:
+      - cell-1-net
+      - cell-2-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - cell-1-net
+      - cell-2-net
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    networks:
+      - cell-1-net
+      - cell-2-net
+
+networks:
+  cell-1-net:
+  cell-2-net:
+  router-net:
+
+volumes:
+  cell-1-pg-data:
+  cell-2-pg-data:
