@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: celluser
       POSTGRES_PASSWORD: cellpass123
     volumes:
-      - ./cell-1/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../code/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - cell-1-pg-data:/var/lib/postgresql/data
     networks:
       - cell-1-net
@@ -37,7 +37,9 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
 
   cell-1-api:
-    build: ./cell-1/api
+    build:
+      context: ../code/api
+      dockerfile: Dockerfile
     environment:
       CELL_ID: cell-1
       POSTGRES_HOST: cell-1-postgres
@@ -68,7 +70,7 @@ services:
       POSTGRES_USER: celluser
       POSTGRES_PASSWORD: cellpass123
     volumes:
-      - ./cell-2/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../code/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - cell-2-pg-data:/var/lib/postgresql/data
     networks:
       - cell-2-net
@@ -99,7 +101,9 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
 
   cell-2-api:
-    build: ./cell-2/api
+    build:
+      context: ../code/api
+      dockerfile: Dockerfile
     environment:
       CELL_ID: cell-2
       POSTGRES_HOST: cell-2-postgres
@@ -123,13 +127,46 @@ services:
       timeout: 3s
       retries: 3
 
+  cell-1-worker:
+    build:
+      context: ../code/worker
+      dockerfile: Dockerfile
+    environment:
+      CELL_ID: cell-1
+      RABBITMQ_HOST: cell-1-rabbitmq
+    networks:
+      - cell-1-net
+    depends_on:
+      cell-1-rabbitmq:
+        condition: service_started
+
+  cell-2-worker:
+    build:
+      context: ../code/worker
+      dockerfile: Dockerfile
+    environment:
+      CELL_ID: cell-2
+      RABBITMQ_HOST: cell-2-rabbitmq
+    networks:
+      - cell-2-net
+    depends_on:
+      cell-2-rabbitmq:
+        condition: service_started
+
   router:
-    build: ./router
+    build:
+      context: ../code/router
+      dockerfile: Dockerfile
     ports:
       - "80:80"
     networks:
       - cell-1-net
       - cell-2-net
+    depends_on:
+      cell-1-api:
+        condition: service_started
+      cell-2-api:
+        condition: service_started
 
   prometheus:
     image: prom/prometheus:latest
@@ -152,28 +189,6 @@ services:
     networks:
       - cell-1-net
       - cell-2-net
-
-  cell-1-worker:
-    build: ./cell-1/worker
-    environment:
-      CELL_ID: cell-1
-      RABBITMQ_HOST: cell-1-rabbitmq
-    networks:
-      - cell-1-net
-    depends_on:
-      cell-1-rabbitmq:
-        condition: service_started
-
-  cell-2-worker:
-    build: ./cell-2/worker
-    environment:
-      CELL_ID: cell-2
-      RABBITMQ_HOST: cell-2-rabbitmq
-    networks:
-      - cell-2-net
-    depends_on:
-      cell-2-rabbitmq:
-        condition: service_started
 
 networks:
   cell-1-net:

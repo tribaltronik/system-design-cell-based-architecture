@@ -10,9 +10,16 @@ import time
 import pika
 
 app = FastAPI()
-redis_client = Redis(
-    host=os.getenv("REDIS_HOST", "cell-1-redis"), port=6379, decode_responses=True
-)
+
+CELL_ID = os.getenv("CELL_ID", "unknown")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", f"{CELL_ID}-postgres")
+REDIS_HOST = os.getenv("REDIS_HOST", f"{CELL_ID}-redis")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", f"{CELL_ID}-rabbitmq")
+DB_NAME = os.getenv("DB_NAME", "celldb")
+DB_USER = os.getenv("DB_USER", "celluser")
+DB_PASS = os.getenv("DB_PASS", "cellpass123")
+
+redis_client = Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
 REQUEST_COUNT = Counter("api_requests_total", "Total requests", ["cell", "endpoint"])
 REQUEST_DURATION = Histogram(
@@ -31,10 +38,10 @@ class Job(BaseModel):
 
 def get_db_connection():
     return psycopg2.connect(
-        host=os.getenv("POSTGRES_HOST", "cell-1-postgres"),
-        database=os.getenv("DB_NAME", "celldb"),
-        user=os.getenv("DB_USER", "celluser"),
-        password=os.getenv("DB_PASS", "cellpass123"),
+        host=POSTGRES_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
     )
 
 
@@ -44,17 +51,16 @@ async def add_metrics(request, call_next):
     response = await call_next(request)
     duration = time.time() - start_time
 
-    cell_id = os.getenv("CELL_ID", "unknown")
     endpoint = request.url.path
-    REQUEST_COUNT.labels(cell=cell_id, endpoint=endpoint).inc()
-    REQUEST_DURATION.labels(cell=cell_id, endpoint=endpoint).observe(duration)
+    REQUEST_COUNT.labels(cell=CELL_ID, endpoint=endpoint).inc()
+    REQUEST_DURATION.labels(cell=CELL_ID, endpoint=endpoint).observe(duration)
 
     return response
 
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "cell": os.getenv("CELL_ID", "unknown")}
+    return {"status": "healthy", "cell": CELL_ID}
 
 
 @app.get("/metrics")
@@ -66,7 +72,7 @@ def metrics():
 def get_data(key: str):
     cached = redis_client.get(key)
     if cached:
-        return {"value": cached, "source": "cache", "cell": os.getenv("CELL_ID")}
+        return {"value": cached, "source": "cache", "cell": CELL_ID}
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -76,7 +82,7 @@ def get_data(key: str):
 
     if result:
         redis_client.set(key, result[0], ex=300)
-        return {"value": result[0], "source": "database", "cell": os.getenv("CELL_ID")}
+        return {"value": result[0], "source": "database", "cell": CELL_ID}
 
     raise HTTPException(status_code=404, detail="not found")
 
@@ -94,7 +100,7 @@ def post_data(item: DataItem):
     conn.commit()
     conn.close()
     redis_client.delete(item.key)
-    return {"status": "ok", "cell": os.getenv("CELL_ID")}
+    return {"status": "ok", "cell": CELL_ID}
 
 
 @app.delete("/data/{key}")
@@ -105,13 +111,12 @@ def delete_data(key: str):
     conn.commit()
     conn.close()
     redis_client.delete(key)
-    return {"status": "deleted", "cell": os.getenv("CELL_ID")}
+    return {"status": "deleted", "cell": CELL_ID}
 
 
 @app.post("/job")
 def create_job(job: Job):
-    rabbitmq_host = os.getenv("RABBITMQ_HOST", "cell-1-rabbitmq")
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
     channel = connection.channel()
     channel.queue_declare(queue="tasks", durable=True)
     channel.basic_publish(
@@ -121,4 +126,4 @@ def create_job(job: Job):
         properties=pika.BasicProperties(delivery_mode=2),
     )
     connection.close()
-    return {"status": "queued", "task": job.task, "cell": os.getenv("CELL_ID")}
+    return {"status": "queued", "task": job.task, "cell": CELL_ID}

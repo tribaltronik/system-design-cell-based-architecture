@@ -4,7 +4,7 @@ import os
 import sys
 
 CELL_ID = os.getenv("CELL_ID", "unknown")
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "cell-1-rabbitmq")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", f"{CELL_ID}-rabbitmq")
 
 print(f"[{CELL_ID}] Starting worker...")
 print(f"[{CELL_ID}] Connecting to RabbitMQ at {RABBITMQ_HOST}")
