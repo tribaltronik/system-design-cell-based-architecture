@@ -81,3 +81,31 @@ k8s-delete:
 	@echo "Deleting k8s resources..."
 	kubectl delete namespace cell-1 cell-2 monitoring
 	kubectl delete -f k8s/router.yaml
+
+k8s-test:
+	@echo "Testing k8s failover..."
+	@echo ""
+	@echo "Step 1: Both cells up"
+	@echo "    Checking cell-1..."
+	@kubectl exec deploy/cell-1-api -n cell-1 -- python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" >/dev/null 2>&1 && echo "    (Cell-1 OK)" || echo "    (Cell-1 FAILED)"
+	@echo "    Checking cell-2..."
+	@kubectl exec deploy/cell-2-api -n cell-2 -- python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" >/dev/null 2>&1 && echo "    (Cell-2 OK)" || echo "    (Cell-2 FAILED)"
+	@echo ""
+	@echo "Step 2: Delete Cell-1 API pod (forcing restart)"
+	@kubectl delete pod -n cell-1 -l app=cell-1-api
+	@echo "    (waiting 30s for k8s to restart pod...)"
+	@sleep 30
+	@kubectl exec deploy/cell-1-api -n cell-1 -- python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" >/dev/null 2>&1 && echo "    (Cell-1 recovered)" || echo "    (Cell-1 starting...)"
+	@kubectl exec deploy/cell-2-api -n cell-2 -- python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" >/dev/null 2>&1 && echo "    (Cell-2 still works)"
+	@echo ""
+	@echo "Step 3: Delete Cell-2 API pod"
+	@kubectl delete pod -n cell-2 -l app=cell-2-api
+	@sleep 30
+	@kubectl exec deploy/cell-2-api -n cell-2 -- python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" >/dev/null 2>&1 && echo "    (Cell-2 recovered)" || echo "    (Cell-2 starting...)"
+	@echo ""
+	@echo "Done!"
+
+k8s-logs:
+	@echo "Streaming logs from all pods..."
+	kubectl logs -l app=cell-1-api -n cell-1 --tail=10 -f &
+	kubectl logs -l app=cell-2-api -n cell-2 --tail=10 -f
