@@ -1,4 +1,4 @@
-.PHONY: start build clean test logs k8s-create-cluster k8s-delete-cluster k8s-deploy k8s-delete
+.PHONY: start build clean test logs k8s-create-cluster k8s-delete-cluster k8s-deploy k8s-delete k8s-start k8s-test
 
 build:
 	cd docker-compose && docker compose build
@@ -76,6 +76,8 @@ k8s-load:
 	@echo "Loading images into kind..."
 	kind load docker-image cell-based-architecture-api:latest --name cell-based-architecture
 	kind load docker-image cell-based-architecture-worker:latest --name cell-based-architecture
+
+k8s-start: k8s-create-cluster k8s-build k8s-load k8s-deploy
 
 k8s-delete:
 	@echo "Deleting k8s resources..."
