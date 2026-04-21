@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cell-2-api
+  namespace: cell-2
+  labels:
+    app: cell-2-api
+    cell: cell-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cell-2-api
+  template:
+    metadata:
+      labels:
+        app: cell-2-api
+        cell: cell-2
+    spec:
+      containers:
+        - name: api
+          image: cell-based-architecture-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: CELL_ID
+              value: "cell-2"
+            - name: POSTGRES_HOST
+              value: "cell-2-postgres"
+            - name: REDIS_HOST
+              value: "cell-2-redis"
+            - name: RABBITMQ_HOST
+              value: "cell-2-rabbitmq"
+            - name: DB_NAME
+              value: "celldb"
+            - name: DB_USER
+              value: "celluser"
+            - name: DB_PASS
+              value: "cellpass123"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cell-2-api
+  namespace: cell-2
+spec:
+  selector:
+    app: cell-2-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cell-1-postgres-init
+  namespace: cell-1
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS data (
+        key VARCHAR(255) PRIMARY KEY,
+        value TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_created_at ON data(created_at);
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cell-1-postgres
+  namespace: cell-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cell-1-postgres
+  template:
+    metadata:
+      labels:
+        app: cell-1-postgres
+        cell: cell-1
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_DB
+              value: "celldb"
+            - name: POSTGRES_USER
+              value: "celluser"
+            - name: POSTGRES_PASSWORD
+              value: "cellpass123"
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "celluser"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: postgres-init
+          configMap:
+            name: cell-1-postgres-init
+        - name: postgres-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cell-1-postgres
+  namespace: cell-1
+spec:
+  selector:
+    app: cell-1-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cell-1-redis
+  namespace: cell-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cell-1-redis
+  template:
+    metadata:
+      labels:
+        app: cell-1-redis
+        cell: cell-1
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cell-1-redis
+  namespace: cell-1
+spec:
+  selector:
+    app: cell-1-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cell-1-rabbitmq
+  namespace: cell-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cell-1-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: cell-1-rabbitmq
+        cell: cell-1
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management-alpine
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "guest"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cell-1-rabbitmq
+  namespace: cell-1
+spec:
+  selector:
+    app: cell-1-rabbitmq
+  ports:
+    - port: 5672
+      targetPort: 5672
+      name: amqp
+    - port: 15672
+      targetPort: 15672
+      name: management

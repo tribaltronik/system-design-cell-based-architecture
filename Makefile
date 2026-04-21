@@ -1,4 +1,4 @@
-.PHONY: start build clean test logs
+.PHONY: start build clean test logs k8s-create-cluster k8s-delete-cluster k8s-deploy k8s-delete
 
 build:
 	cd docker-compose && docker compose build
@@ -40,3 +40,44 @@ test:
 	@curl -s --fail http://localhost:8080/health >/dev/null 2>&1 && echo "(Cell-1 recovered)"
 	@echo ""
 	@echo "Done!"
+
+k8s-create-cluster:
+	@echo "Creating kind cluster..."
+	kind create cluster --config k8s/kind-config.yaml
+
+k8s-delete-cluster:
+	@echo "Deleting kind cluster..."
+	kind delete cluster --name cell-based-architecture
+
+k8s-deploy:
+	@echo "Deploying to k8s..."
+	kubectl apply -f k8s/namespace.yaml
+	kubectl apply -f k8s/cell-1/
+	kubectl apply -f k8s/cell-2/
+	kubectl apply -f k8s/router.yaml
+	kubectl apply -f k8s/monitoring-rbac.yaml
+	kubectl apply -f k8s/monitoring-config.yaml
+	kubectl apply -f k8s/monitoring.yaml
+	kubectl apply -f k8s/monitoring-dashboards.yaml
+	@echo "Waiting for Grafana to be ready..." && sleep 35
+	kubectl port-forward -n monitoring svc/grafana 3000:3000 &>/dev/null &
+	sleep 3
+	curl -s -u admin:admin -X DELETE http://localhost:3000/api/datasources/uid/PBFA97CFB590B2093 || true
+	curl -s -u admin:admin -X POST http://localhost:3000/api/datasources -H 'Content-Type: application/json' -d '{"name":"Prometheus","type":"prometheus","url":"http://prometheus.monitoring:9090","access":"proxy","isDefault":true,"uid":"PBFA97CFB590B2093"}'
+	cat code/monitoring/grafana/provisioning/dashboards/cell-dashboard.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'dashboard':d,'overwrite':True}))" | curl -s -u admin:admin -X POST http://localhost:3000/api/dashboards/db -H 'Content-Type: application/json' -d @-
+	@echo "Deploy complete!"
+
+k8s-build:
+	@echo "Building images for k8s..."
+	docker build -t cell-based-architecture-api:latest ./code/api
+	docker build -t cell-based-architecture-worker:latest ./code/worker
+
+k8s-load:
+	@echo "Loading images into kind..."
+	kind load docker-image cell-based-architecture-api:latest --name cell-based-architecture
+	kind load docker-image cell-based-architecture-worker:latest --name cell-based-architecture
+
+k8s-delete:
+	@echo "Deleting k8s resources..."
+	kubectl delete namespace cell-1 cell-2 monitoring
+	kubectl delete -f k8s/router.yaml

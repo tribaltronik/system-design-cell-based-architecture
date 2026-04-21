@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router
+  namespace: default
+  labels:
+    app: router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router
+  template:
+    metadata:
+      labels:
+        app: router
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: router-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-config
+data:
+  default.conf: |
+    resolver 127.0.0.11 valid=10s;
+    
+    upstream cells {
+        hash $arg_user_id consistent;
+        server cell-1-api.cell-1.svc.cluster.local:8000;
+        server cell-2-api.cell-2.svc.cluster.local:8000;
+    }
+    
+    server {
+        listen 80;
+        
+        location / {
+            proxy_pass http://cells;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        
+        location /health {
+            proxy_pass http://cells;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router
+spec:
+  selector:
+    app: router
+  ports:
+    - port: 80
+      targetPort: 80
+  type: LoadBalancer

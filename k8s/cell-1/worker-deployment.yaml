@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cell-1-worker
+  namespace: cell-1
+  labels:
+    app: cell-1-worker
+    cell: cell-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cell-1-worker
+  template:
+    metadata:
+      labels:
+        app: cell-1-worker
+        cell: cell-1
+    spec:
+      containers:
+        - name: worker
+          image: cell-based-architecture-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CELL_ID
+              value: "cell-1"
+            - name: RABBITMQ_HOST
+              value: "cell-1-rabbitmq"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
